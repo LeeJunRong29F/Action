@@ -16,7 +16,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.x'  # Use the latest Python 3 version
+          python-version: '3.x'  # Specify your Python version
 
       - name: Install dependencies
         run: |
@@ -27,7 +27,7 @@ jobs:
           python update_csv.py
 
       - name: Upload CSV file
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: counter-csv
           path: counter.csv
