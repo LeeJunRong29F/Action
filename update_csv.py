@@ -1,20 +1,23 @@
 import pandas as pd
 import os
 
-# Define the path to the CSV file
 csv_file = 'counter.csv'
 
-# Check if the CSV file exists
-if os.path.exists(csv_file):
-    # Read the existing CSV file
-    df = pd.read_csv(csv_file)
-    # Increment the value
-    new_value = df['Value'].iloc[0] + 1
-    # Update the DataFrame
-    df.loc[0] = [new_value]
+# Check if the file exists
+if not os.path.isfile(csv_file):
+    # Create the file with initial value if it does not exist
+    df = pd.DataFrame({'count': [0]})
+    df.to_csv(csv_file, index=False)
 else:
-    # Create a new DataFrame with initial value 0
-    df = pd.DataFrame({'Value': [0]})
+    # Read the existing file
+    try:
+        df = pd.read_csv(csv_file)
+    except pd.errors.EmptyDataError:
+        # Handle the case where the file is empty
+        df = pd.DataFrame({'count': [0]})
 
-# Save the DataFrame to the CSV file
+# Increment the count
+df['count'] += 1
+
+# Save the updated DataFrame
 df.to_csv(csv_file, index=False)
