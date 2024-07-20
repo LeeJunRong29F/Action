@@ -1,0 +1,33 @@
+name: Run Python Script Every 10 Minutes
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'  # Runs every 10 minutes
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'  # Use the latest Python 3 version
+
+      - name: Install dependencies
+        run: |
+          pip install pandas
+
+      - name: Run script
+        run: |
+          python update_csv.py
+
+      - name: Upload CSV file
+        uses: actions/upload-artifact@v3
+        with:
+          name: counter-csv
+          path: counter.csv
