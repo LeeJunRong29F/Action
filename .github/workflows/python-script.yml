@@ -1,4 +1,4 @@
-name: Run Python Script Every 10 Minutes
+name: Update and Commit CSV File Every 10 Minutes
 
 on:
   schedule:
@@ -6,17 +6,17 @@ on:
   workflow_dispatch:  # Allows manual trigger
 
 jobs:
-  run-script:
+  update-csv:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3  # Ensure this version supports Node.js 20
+        uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v4  # Ensure this version supports Node.js 20
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.x'  # Specify your Python version
+          python-version: '3.x'
 
       - name: Install dependencies
         run: |
@@ -26,8 +26,12 @@ jobs:
         run: |
           python update_csv.py
 
-      - name: Upload CSV file
-        uses: actions/upload-artifact@v4
-        with:
-          name: counter-csv
-          path: counter.csv
+      - name: Commit and push changes
+        env:
+          PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+        run: |
+          git config --global user.name 'github-actions'
+          git config --global user.email 'github-actions@github.com'
+          git add counter.csv
+          git commit -m 'Update counter.csv'
+          git push https://x-access-token:${PERSONAL_ACCESS_TOKEN}@github.com/${{ github.repository }} HEAD:${{ github.ref }}
