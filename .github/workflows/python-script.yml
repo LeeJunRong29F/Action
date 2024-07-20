@@ -26,12 +26,24 @@ jobs:
         run: |
           python update_csv.py
 
+      - name: Verify CSV file
+        run: |
+          ls -l counter.csv
+          cat counter.csv
+
+      - name: Configure Git
+        run: |
+          git config --global user.name 'github-actions'
+          git config --global user.email 'github-actions@github.com'
+
+      - name: Check Git status
+        run: |
+          git status
+
       - name: Commit and push changes
         env:
           PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         run: |
-          git config --global user.name 'github-actions'
-          git config --global user.email 'github-actions@github.com'
           git add counter.csv
-          git commit -m 'Update counter.csv' || echo "No changes to commit"
+          git diff --cached --quiet || git commit -m 'Update counter.csv'
           git push https://x-access-token:${PERSONAL_ACCESS_TOKEN}@github.com/${{ github.repository }} HEAD:${{ github.ref }}
