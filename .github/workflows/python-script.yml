@@ -33,5 +33,5 @@ jobs:
           git config --global user.name 'github-actions'
           git config --global user.email 'github-actions@github.com'
           git add counter.csv
-          git commit -m 'Update counter.csv'
+          git commit -m 'Update counter.csv' || echo "No changes to commit"
           git push https://x-access-token:${PERSONAL_ACCESS_TOKEN}@github.com/${{ github.repository }} HEAD:${{ github.ref }}
