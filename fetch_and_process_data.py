@@ -22,13 +22,13 @@ def get_latest_timestamp():
     return None
 
 def fetch_new_data(since_timestamp):
-    # PostgreSQL connection details
+    # PostgreSQL connection details from environment variables
     pg_conn = psycopg2.connect(
-        dbname="smart_composting_api",
-        user="npds_a",
-        password="npds_A_rg6STCC-8LoXakAHDJerqtZNlRr5TtlvcxSrJFOa9rbdeLmf4THld-8LEaaXnjTCbCjGdl9evTGe2kxRA8vrbg",
-        host="db.composting.tinkerthings.global",
-        port="6969"
+        dbname=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        host=os.getenv("DB_HOST"),
+        port=os.getenv("DB_PORT")
     )
 
     cursor = pg_conn.cursor()
@@ -95,13 +95,13 @@ def fetch_new_data(since_timestamp):
     return data_dict
 
 def fetch_all_data():
-    # PostgreSQL connection details
+    # PostgreSQL connection details from environment variables
     pg_conn = psycopg2.connect(
-        dbname="smart_composting_api",
-        user="npds_a",
-        password="npds_A_rg6STCC-8LoXakAHDJerqtZNlRr5TtlvcxSrJFOa9rbdeLmf4THld-8LEaaXnjTCbCjGdl9evTGe2kxRA8vrbg",
-        host="db.composting.tinkerthings.global",
-        port="6969"
+        dbname=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        host=os.getenv("DB_HOST"),
+        port=os.getenv("DB_PORT")
     )
     cursor = pg_conn.cursor()
 
