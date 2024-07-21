@@ -3,13 +3,13 @@ import psycopg2
 import pandas as pd
 import json
 
-# PostgreSQL connection details from environment variables
+# PostgreSQL connection details
 pg_conn = psycopg2.connect(
-    dbname=os.getenv("DB_NAME"),
-    user=os.getenv("DB_USER"),
-    password=os.getenv("DB_PASSWORD"),
-    host=os.getenv("DB_HOST"),
-    port=os.getenv("DB_PORT")
+    dbname="smart_composting_api",
+    user="npds_a",
+    password="npds_A_rg6STCC-8LoXakAHDJerqtZNlRr5TtlvcxSrJFOa9rbdeLmf4THld-8LEaaXnjTCbCjGdl9evTGe2kxRA8vrbg",
+    host="db.composting.tinkerthings.global",
+    port="6969"
 )
 
 cursor = pg_conn.cursor()
