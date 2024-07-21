@@ -74,7 +74,7 @@ if 'Soil - PH' in pivot_df.columns:
 data_dict = {}
 for _, row in pivot_df.iterrows():
     devicename = row['devicename']
-    timestamp = row['devicetimestamp']
+    timestamp = row['devicetimestamp'].strftime('%Y-%m-%dT%H:%M:%S')  # Convert Timestamp to string
     if devicename not in data_dict:
         data_dict[devicename] = {}
     data_dict[devicename][timestamp] = row.drop(['devicename', 'deviceid', 'devicetimestamp']).to_dict()
