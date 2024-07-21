@@ -1,15 +1,17 @@
+import os
 import psycopg2
 import pandas as pd
 import json
 
-# PostgreSQL connection details
+# PostgreSQL connection details from environment variables
 pg_conn = psycopg2.connect(
-    dbname="smart_composting_api",
-    user="npds_a",
-    password="npds_A_rg6STCC-8LoXakAHDJerqtZNlRr5TtlvcxSrJFOa9rbdeLmf4THld-8LEaaXnjTCbCjGdl9evTGe2kxRA8vrbg",
-    host="db.composting.tinkerthings.global",
-    port="6969"
+    dbname=os.getenv("DB_NAME"),
+    user=os.getenv("DB_USER"),
+    password=os.getenv("DB_PASSWORD"),
+    host=os.getenv("DB_HOST"),
+    port=os.getenv("DB_PORT")
 )
+
 cursor = pg_conn.cursor()
 
 # Query to join the tables
@@ -68,5 +70,15 @@ if 'Soil - Temperature' in pivot_df.columns:
 if 'Soil - PH' in pivot_df.columns:
     pivot_df['Soil - PH'] = replace_out_of_range(pivot_df['Soil - PH'], 0, 14)
 
+# Format the DataFrame into a nested dictionary
+data_dict = {}
+for _, row in pivot_df.iterrows():
+    devicename = row['devicename']
+    timestamp = row['devicetimestamp']
+    if devicename not in data_dict:
+        data_dict[devicename] = {}
+    data_dict[devicename][timestamp] = row.drop(['devicename', 'deviceid', 'devicetimestamp']).to_dict()
+
 # Save the final DataFrame to a JSON file
-pivot_df.to_json('processed_data.json', orient='records')
+with open('processed_data.json', 'w') as f:
+    json.dump(data_dict, f, indent=4)  # Pretty-print the JSON with an indentation of 4 spaces
