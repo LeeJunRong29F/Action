@@ -59,6 +59,9 @@ def fetch_new_data(since_timestamp):
     # Convert data to a pandas DataFrame
     combined_df = pd.DataFrame(rows, columns=columns)
 
+    # Adjust timestamp by adding 8 hours
+    combined_df['devicetimestamp'] = pd.to_datetime(combined_df['devicetimestamp']) + pd.Timedelta(hours=8)
+
     # Process and pivot the data as needed
     pivot_df = combined_df.pivot_table(
         index=['devicename', 'deviceid', 'devicetimestamp'],
@@ -131,6 +134,9 @@ def fetch_all_data():
     # Convert data to a pandas DataFrame
     combined_df = pd.DataFrame(rows, columns=columns)
 
+    # Adjust timestamp by adding 8 hours
+    combined_df['devicetimestamp'] = pd.to_datetime(combined_df['devicetimestamp']) + pd.Timedelta(hours=8)
+
     # Process and pivot the data as needed
     pivot_df = combined_df.pivot_table(
         index=['devicename', 'deviceid', 'devicetimestamp'],
@@ -174,7 +180,7 @@ def push_to_firebase(data_dict):
 
 if __name__ == "__main__":
     latest_timestamp = get_latest_timestamp()
-    if latest_timestamp:
+    if (latest_timestamp):
         print(f'Latest timestamp in Firebase: {latest_timestamp}')
         new_data = fetch_new_data(latest_timestamp)
     else:
