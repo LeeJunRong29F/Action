@@ -9,7 +9,7 @@ FIREBASE_DATABASE_URL = os.getenv('FIREBASE_DATABASE_URL')
 FIREBASE_DATABASE_SECRET = os.getenv('FIREBASE_DATABASE_SECRET')
 
 def get_latest_timestamp():
-    response = requests.get(f'{FIREBASE_DATABASE_URL}/Tanks.json?auth={FIREBASE_DATABASE_SECRET}')
+    response = requests.get(f'{FIREBASE_DATABASE_URL}/Tanks/data.json?auth={FIREBASE_DATABASE_SECRET}')
     data = response.json()
     if data:
         # Flatten the nested dictionary to get all timestamps
@@ -169,7 +169,7 @@ def fetch_all_data():
 def push_to_firebase(data_dict):
     for devicename, timestamps in data_dict.items():
         for timestamp, values in timestamps.items():
-            url = f'{FIREBASE_DATABASE_URL}/Tanks/{devicename}/{timestamp}.json?auth={FIREBASE_DATABASE_SECRET}'
+            url = f'{FIREBASE_DATABASE_URL}/Tanks/data/{devicename}/{timestamp}.json?auth={FIREBASE_DATABASE_SECRET}'
             requests.put(url, json=values)
 
 if __name__ == "__main__":
