@@ -22,6 +22,9 @@ def get_latest_timestamp():
     return None
 
 def fetch_new_data(since_timestamp):
+    # Adjust the timestamp by subtracting 8 hours to align with PostgreSQL time
+    since_timestamp = pd.to_datetime(since_timestamp) - pd.Timedelta(hours=8)
+    
     # PostgreSQL connection details from environment variables
     pg_conn = psycopg2.connect(
         dbname=os.getenv("DB_NAME"),
