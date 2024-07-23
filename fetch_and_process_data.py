@@ -221,6 +221,6 @@ if __name__ == "__main__":
         new_data = fetch_all_data()
     
     # Optionally delete old data (adjust path as needed)
-    # delete_from_firebase('Tanks/data/NDS006/Tanks')
+    delete_from_firebase('Tanks/data/NDS006/Tanks')
     
     push_to_firebase(new_data)
