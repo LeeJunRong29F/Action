@@ -203,6 +203,14 @@ def push_to_firebase(data_dict):
             url = f'{FIREBASE_DATABASE_URL}/Tanks/data/{devicename}/{timestamp}.json?auth={FIREBASE_DATABASE_SECRET}'
             requests.put(url, json=values)
 
+def delete_from_firebase(path):
+    url = f'{FIREBASE_DATABASE_URL}/{path}.json?auth={FIREBASE_DATABASE_SECRET}'
+    response = requests.delete(url)
+    if response.status_code == 200:
+        print(f"Successfully deleted {path}")
+    else:
+        print(f"Failed to delete {path}. Status code: {response.status_code}")
+
 if __name__ == "__main__":
     latest_timestamp = get_latest_timestamp()
     if latest_timestamp:
@@ -211,5 +219,8 @@ if __name__ == "__main__":
     else:
         print('No existing data in Firebase. Fetching all data.')
         new_data = fetch_all_data()
+    
+    # Optionally delete old data (adjust path as needed)
+    # delete_from_firebase('Tanks/data/NDS006/Tanks')
     
     push_to_firebase(new_data)
