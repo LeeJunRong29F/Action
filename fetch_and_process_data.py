@@ -11,14 +11,36 @@ FIREBASE_DATABASE_SECRET = os.getenv('FIREBASE_DATABASE_SECRET')
 def get_latest_timestamp():
     response = requests.get(f'{FIREBASE_DATABASE_URL}/Tanks/data.json?auth={FIREBASE_DATABASE_SECRET}')
     data = response.json()
+
+    # Print the fetched data to inspect its structure
+    print("Fetched data:", json.dumps(data, indent=2))
+
     if data:
         # Flatten the nested dictionary to get all timestamps
         timestamps = []
         for device_data in data.values():
             timestamps.extend(device_data.keys())
+
+        # Print timestamps to inspect
+        print("Timestamps:", timestamps)
+
         if timestamps:
-            latest_timestamp = max(timestamps, key=lambda k: pd.to_datetime(k))
-            return latest_timestamp
+            # Filter out invalid timestamps
+            valid_timestamps = []
+            for ts in timestamps:
+                try:
+                    pd.to_datetime(ts, errors='coerce')
+                    valid_timestamps.append(ts)
+                except Exception:
+                    print(f"Invalid timestamp format: {ts}")
+
+            if valid_timestamps:
+                try:
+                    # Convert timestamps to datetime and find the max
+                    latest_timestamp = max(valid_timestamps, key=lambda k: pd.to_datetime(k, errors='coerce'))
+                    return latest_timestamp
+                except Exception as e:
+                    print("Error converting valid timestamps:", e)
     return None
 
 def fetch_new_data(since_timestamp):
@@ -183,7 +205,7 @@ def push_to_firebase(data_dict):
 
 if __name__ == "__main__":
     latest_timestamp = get_latest_timestamp()
-    if (latest_timestamp):
+    if latest_timestamp:
         print(f'Latest timestamp in Firebase: {latest_timestamp}')
         new_data = fetch_new_data(latest_timestamp)
     else:
