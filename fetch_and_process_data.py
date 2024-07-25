@@ -75,12 +75,14 @@ def fetch_new_data(since_timestamp=None):
     combined_df['devicetimestamp'] = pd.to_datetime(combined_df['devicetimestamp']) + pd.Timedelta(hours=8)
     combined_df['hourly_interval'] = combined_df['devicetimestamp'].dt.floor('H')
 
+    # Pivot the DataFrame to reshape it
     pivot_df = combined_df.pivot_table(
-        index=['devicename', 'deviceid', 'hourly_interval'],
+        index=['devicename', 'deviceid', 'devicetimestamp', 'hourly_interval'],
         columns='sensordescription',
         values='value',
-        aggfunc='mean'
+        aggfunc='first'
     ).reset_index()
+
     pivot_df.columns.name = None
     pivot_df.columns = [str(col) for col in pivot_df.columns]
 
@@ -97,39 +99,62 @@ def fetch_new_data(since_timestamp=None):
     if 'Soil - PH' in pivot_df.columns:
         pivot_df['Soil - PH'] = replace_out_of_range(pivot_df['Soil - PH'], 0, 14)
 
-    data_dict = {}
-    for _, row in pivot_df.iterrows():
+    # Group by 'deviceid' and get the latest entry for each group
+    latest_live_df = pivot_df.loc[pivot_df.groupby(['deviceid'])['devicetimestamp'].idxmax()]
+
+    # Group by 'devicename', 'deviceid', and 'hourly_interval' and calculate the mean
+    grouped_df = pivot_df.groupby(['devicename', 'deviceid', 'hourly_interval']).mean().reset_index()
+
+    # Prepare data_dict1 from grouped_df
+    data_dict1 = {}
+    for _, row in grouped_df.iterrows():
         devicename = row['devicename']
         start_time = row['hourly_interval']
         end_time = start_time + pd.Timedelta(hours=1)
         timestamp = f"{start_time.strftime('%Y-%m-%dT%H:%M:%S')} - {end_time.strftime('%H:%M:%S')}"
-        if devicename not in data_dict:
-            data_dict[devicename] = {}
-        data_dict[devicename][timestamp] = row.drop(['devicename', 'deviceid', 'hourly_interval']).to_dict()
+        if devicename not in data_dict1:
+            data_dict1[devicename] = {}
+        data_dict1[devicename][timestamp] = row.drop(['devicename', 'deviceid', 'hourly_interval']).to_dict()
 
-    return data_dict
+    # Prepare data_dict2 from latest_live_df
+    data_dict2 = {}
+    for _, row in latest_live_df.iterrows():
+        devicename = row['devicename']
+        if devicename not in data_dict2:
+            data_dict2[devicename] = {}
+        data_dict2[devicename] = row.drop(['devicename', 'deviceid', 'devicetimestamp']).to_dict()
+
+    return data_dict1, data_dict2
 
 # Function to push data to Firebase
-def push_data_to_firebase(data):
-    for device_name, timestamps in data.items():
+def push_data_to_firebase(data_dict1, data_dict2):
+    # Push data_dict1
+    for device_name, timestamps in data_dict1.items():
         for timestamp, values in timestamps.items():
-            url = f'{FIREBASE_DATABASE_URL}/Tanks/data/{device_name}/{timestamp}.json?auth={FIREBASE_DATABASE_SECRET}'
+            url = f'{FIREBASE_DATABASE_URL}/Tanks/{device_name}/HourlyData/{timestamp}.json?auth={FIREBASE_DATABASE_SECRET}'
             response = requests.put(url, json=values)
             if response.status_code != 200:
                 print(f"Failed to push data for {device_name} at {timestamp}: {response.content}")
+
+    # Push data_dict2
+    for device_name, values in data_dict2.items():
+        url = f'{FIREBASE_DATABASE_URL}/Tanks/{device_name}/LiveData/LatestData.json?auth={FIREBASE_DATABASE_SECRET}'
+        response = requests.put(url, json=values)
+        if response.status_code != 200:
+            print(f"Failed to push latest data for {device_name}: {response.content}")
 
 # Main process
 def main():
     latest_timestamp = get_latest_timestamp()
     if latest_timestamp:
         print(f"Latest timestamp from Firebase: {latest_timestamp}")
-        new_data = fetch_new_data(latest_timestamp)
+        data_dict1, data_dict2 = fetch_new_data(latest_timestamp)
     else:
         print("No data found in Firebase or unable to fetch latest timestamp. Fetching all data.")
-        new_data = fetch_new_data()
+        data_dict1, data_dict2 = fetch_new_data()
 
-    if new_data:
-        push_data_to_firebase(new_data)
+    if data_dict1 or data_dict2:
+        push_data_to_firebase(data_dict1, data_dict2)
 
 if __name__ == "__main__":
     main()
