@@ -16,7 +16,8 @@ def get_latest_timestamp():
     if data:
         timestamps = []
         for device_data in data.values():
-            timestamps.extend(device_data.keys())
+            if isinstance(device_data, dict):
+                timestamps.extend(device_data.keys())
 
         if timestamps:
             valid_timestamps = []
@@ -34,7 +35,7 @@ def get_latest_timestamp():
     return None
 
 # Function to fetch new data from PostgreSQL
-def fetch_new_data(since_timestamp):
+def fetch_new_data(since_timestamp=None):
     pg_conn = psycopg2.connect(
         dbname=os.getenv("DB_NAME"),
         user=os.getenv("DB_USER"),
@@ -45,7 +46,7 @@ def fetch_new_data(since_timestamp):
 
     cursor = pg_conn.cursor()
 
-    query = f"""
+    query = """
     SELECT
         d.devicename,
         dd.deviceid,
@@ -61,8 +62,11 @@ def fetch_new_data(since_timestamp):
     JOIN
         devices d ON d.deviceid = dd.deviceid
     WHERE
-        dd.deviceid IN (10, 9, 8, 7) AND dd.devicetimestamp > '{since_timestamp}'
+        dd.deviceid IN (10, 9, 8, 7)
     """
+    if since_timestamp:
+        query += f" AND dd.devicetimestamp > '{since_timestamp}'"
+
     cursor.execute(query)
     rows = cursor.fetchall()
     columns = [desc[0] for desc in cursor.description]
@@ -120,7 +124,9 @@ latest_timestamp = get_latest_timestamp()
 if latest_timestamp:
     print(f"Latest timestamp from Firebase: {latest_timestamp}")
     new_data = fetch_new_data(latest_timestamp)
-    if new_data:
-        push_data_to_firebase(new_data)
 else:
-    print("No data found in Firebase or unable to fetch latest timestamp.")
+    print("No data found in Firebase or unable to fetch latest timestamp. Fetching all data.")
+    new_data = fetch_new_data()
+
+if new_data:
+    push_data_to_firebase(new_data)
