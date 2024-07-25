@@ -103,25 +103,6 @@ def fetch_new_data(since_timestamp=None):
 
     return combined_df
 
-# Function to push live data to Firebase
-def push_live_data_to_firebase(data):
-    for device_name, values in data.items():
-        for timestamp, value in values.items():
-            encoded_timestamp = urllib.parse.quote(timestamp)
-            url = f'{FIREBASE_DATABASE_URL}/Tanks/{device_name}/LiveData/{encoded_timestamp}.json?auth={FIREBASE_DATABASE_SECRET}'
-            
-            print(f"Pushing live data for {device_name} at {timestamp}: {value}")  # Debug statement
-            
-            try:
-                response = requests.put(url, json=value)
-                response.raise_for_status()  # Raise an HTTPError for bad responses
-                print(f"Successfully pushed live data for {device_name} at {timestamp}")
-            except requests.exceptions.HTTPError as http_err:
-                print(f"HTTP error occurred for live data of {device_name} at {timestamp}: {http_err}")
-                print(f"Response content: {response.text}")  # Log response content
-            except Exception as err:
-                print(f"Other error occurred for live data of {device_name} at {timestamp}: {err}")
-
 # Function to push aggregated data to Firebase
 def push_aggregated_data_to_firebase(data):
     for device_name, timestamps in data.items():
@@ -175,16 +156,3 @@ if not combined_df.empty:
     if aggregated_data_dict:
         print(f"Aggregated data to push:\n{json.dumps(aggregated_data_dict, indent=2)}")  # Debug statement
         push_aggregated_data_to_firebase(aggregated_data_dict)
-
-    # Process live data
-    live_data = {}
-    for _, row in combined_df.iterrows():
-        devicename = row['devicename']
-        timestamp = row['dbtimestamp']
-        if devicename not in live_data:
-            live_data[devicename] = {}
-        live_data[devicename][timestamp] = row.drop(['devicename', 'deviceid', 'minute_interval', 'dbtimestamp']).to_dict()
-
-    if live_data:
-        print(f"Live data to push:\n{json.dumps(live_data, indent=2)}")  # Debug statement
-        push_live_data_to_firebase(live_data)
