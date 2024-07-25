@@ -84,6 +84,9 @@ def fetch_new_data(since_timestamp=None):
         aggfunc='first'
     ).reset_index()
 
+    # Remove duplicates based on all columns
+    pivot_df = pivot_df.drop_duplicates()
+
     pivot_df.columns.name = None
     pivot_df.columns = [str(col) for col in pivot_df.columns]
 
@@ -95,10 +98,25 @@ def fetch_new_data(since_timestamp=None):
         return valid_series
 
     if 'Soil - Temperature' in pivot_df.columns:
-        pivot_df['Soil - Temperature'] = replace_out_of_range(pivot_df['Soil - Temperature'], 5, 40)
+        pivot_df['Soil - Temperature'] = replace_out_of_range(pivot_df['Soil - Temperature'], -10, 60)
 
     if 'Soil - PH' in pivot_df.columns:
         pivot_df['Soil - PH'] = replace_out_of_range(pivot_df['Soil - PH'], 0, 14)
+
+    if 'Soil - Moisture' in pivot_df.columns:
+        pivot_df['Soil - Moisture'] = replace_out_of_range(pivot_df['Soil - Moisture'], 0, 155)
+
+    if 'Soil - EC' in pivot_df.columns:
+        pivot_df['Soil - EC'] = replace_out_of_range(pivot_df['Soil - EC'], 0, 1023)
+
+    if 'Soil - Nitrogen' in pivot_df.columns:
+        pivot_df['Soil - Nitrogen'] = replace_out_of_range(pivot_df['Soil - Nitrogen'], 0, 300)
+
+    if 'Soil - Potassium' in pivot_df.columns:
+        pivot_df['Soil - Potassium'] = replace_out_of_range(pivot_df['Soil - Potassium'], 0, 300)
+
+    if 'Soil - Phosphorus' in pivot_df.columns:
+        pivot_df['Soil - Phosphorus'] = replace_out_of_range(pivot_df['Soil - Phosphorus'], 0, 300)
 
     # Group by 'deviceid' and get the latest entry for each group
     latest_live_df = pivot_df.loc[pivot_df.groupby(['deviceid'])['devicetimestamp'].idxmax()]
