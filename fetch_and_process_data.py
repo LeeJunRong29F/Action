@@ -148,16 +148,17 @@ def fetch_new_data(since_timestamp=None):
 
     return data_dict1, data_dict2
 
-# Function to push data to Firebase
 def push_data_to_firebase(data_dict1, data_dict2):
     def serialize_data(data):
-        """Convert pd.Timestamp to ISO format string for JSON serialization."""
+        """Convert pd.Timestamp to ISO format string for JSON serialization, and round numerical values."""
         serialized_data = {}
         for k, v in data.items():
             if isinstance(v, pd.Timestamp):
                 serialized_data[k] = v.isoformat()
             elif isinstance(v, dict):
                 serialized_data[k] = serialize_data(v)
+            elif isinstance(v, (int, float)):
+                serialized_data[k] = round(v, 1)  # Round numerical values to 1 decimal place
             else:
                 serialized_data[k] = v
         return serialized_data
