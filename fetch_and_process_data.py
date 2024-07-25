@@ -10,7 +10,7 @@ FIREBASE_DATABASE_SECRET = os.getenv('FIREBASE_DATABASE_SECRET')
 # Function to get the latest timestamp from Firebase
 def get_latest_timestamp():
     response = requests.get(f'{FIREBASE_DATABASE_URL}/Tanks/data.json?auth={FIREBASE_DATABASE_SECRET}')
-	@@ -35,91 +146,6 @@ def get_latest_timestamp():
+	get_latest_timestamp():
                 return latest_timestamp
     return None
 
