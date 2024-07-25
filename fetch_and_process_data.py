@@ -100,32 +100,24 @@ def fetch_new_data(since_timestamp=None):
         pivot_df['Soil - PH'] = replace_out_of_range(pivot_df['Soil - PH'], 0, 14)
 
     data_dict = {}
+    latest_data_dict = {}
+
     for _, row in pivot_df.iterrows():
         devicename = row['devicename']
         start_time = row['minute_interval']
         timestamp = start_time.strftime('%Y-%m-%dT%H:%M:%S')
+
+        # Populate the latest data dict
+        if devicename not in latest_data_dict:
+            latest_data_dict[devicename] = {}
+        latest_data_dict[devicename][timestamp] = row.drop(['devicename', 'deviceid', 'minute_interval']).to_dict()
+
+        # Populate the aggregated data dict
         if devicename not in data_dict:
             data_dict[devicename] = {}
         data_dict[devicename][timestamp] = row.drop(['devicename', 'deviceid', 'minute_interval']).to_dict()
 
-    return data_dict
-
-# Function to push aggregated data to Firebase
-def push_aggregated_data_to_firebase(data):
-    for device_name, timestamps in data.items():
-        for timestamp, values in timestamps.items():
-            # URL encode the timestamp to handle special characters
-            encoded_timestamp = urllib.parse.quote(timestamp)
-            url = f'{FIREBASE_DATABASE_URL}/Tanks/data/{device_name}/{encoded_timestamp}.json?auth={FIREBASE_DATABASE_SECRET}'
-            
-            try:
-                response = requests.put(url, json=values)
-                response.raise_for_status()  # Raise an HTTPError for bad responses
-                print(f"Successfully pushed aggregated data for {device_name} at {timestamp}")
-            except requests.exceptions.HTTPError as http_err:
-                print(f"HTTP error occurred for {device_name} at {timestamp}: {http_err}")
-            except Exception as err:
-                print(f"Other error occurred for {device_name} at {timestamp}: {err}")
+    return data_dict, latest_data_dict
 
 # Function to push latest data to `Livedata`
 def push_latest_data_to_firebase(data):
@@ -144,15 +136,34 @@ def push_latest_data_to_firebase(data):
             except Exception as err:
                 print(f"Other error occurred for {device_name} at {timestamp}: {err}")
 
+# Function to push aggregated data to Firebase
+def push_aggregated_data_to_firebase(data):
+    for device_name, timestamps in data.items():
+        for timestamp, values in timestamps.items():
+            # URL encode the timestamp to handle special characters
+            encoded_timestamp = urllib.parse.quote(timestamp)
+            url = f'{FIREBASE_DATABASE_URL}/Tanks/data/{device_name}/{encoded_timestamp}.json?auth={FIREBASE_DATABASE_SECRET}'
+            
+            try:
+                response = requests.put(url, json=values)
+                response.raise_for_status()  # Raise an HTTPError for bad responses
+                print(f"Successfully pushed aggregated data for {device_name} at {timestamp}")
+            except requests.exceptions.HTTPError as http_err:
+                print(f"HTTP error occurred for {device_name} at {timestamp}: {http_err}")
+            except Exception as err:
+                print(f"Other error occurred for {device_name} at {timestamp}: {err}")
+
 # Main process
 latest_timestamp = get_latest_timestamp()
 if latest_timestamp:
     print(f"Latest timestamp from Firebase: {latest_timestamp}")
-    new_data = fetch_new_data(latest_timestamp)
+    new_data, latest_data = fetch_new_data(latest_timestamp)
 else:
     print("No data found in Firebase or unable to fetch latest timestamp. Fetching all data.")
-    new_data = fetch_new_data()
+    new_data, latest_data = fetch_new_data()
+
+if latest_data:
+    push_latest_data_to_firebase(latest_data)  # Push latest data to Livedata
 
 if new_data:
-    push_latest_data_to_firebase(new_data)  # Push latest data to Livedata
     push_aggregated_data_to_firebase(new_data)  # Push aggregated data to Tanks/data
