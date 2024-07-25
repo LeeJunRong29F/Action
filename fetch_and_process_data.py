@@ -5,9 +5,10 @@ import pandas as pd
 import json
 import urllib.parse
 
-# Firebase configuration
-FIREBASE_DATABASE_URL = 'https://your-database-url.firebaseio.com'
-FIREBASE_DATABASE_SECRET = 'your-database-secret'
+# Fetch secrets from environment variables
+FIREBASE_DATABASE_URL = os.getenv('FIREBASE_DATABASE_URL')
+FIREBASE_DATABASE_SECRET = os.getenv('FIREBASE_DATABASE_SECRET')
+
 
 # Function to get the latest timestamp from Firebase
 def get_latest_timestamp():
