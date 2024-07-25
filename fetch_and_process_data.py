@@ -9,7 +9,6 @@ import urllib.parse
 FIREBASE_DATABASE_URL = os.getenv('FIREBASE_DATABASE_URL')
 FIREBASE_DATABASE_SECRET = os.getenv('FIREBASE_DATABASE_SECRET')
 
-
 # Function to get the latest timestamp from Firebase
 def get_latest_timestamp():
     response = requests.get(f'{FIREBASE_DATABASE_URL}/Tanks/data.json?auth={FIREBASE_DATABASE_SECRET}')
@@ -95,10 +94,13 @@ def fetch_new_data(since_timestamp=None):
         return valid_series
 
     if 'Soil - Temperature' in pivot_df.columns:
-        pivot_df['Soil - Temperature'] = replace_out_of_range(pivot_df['Soil - Temperature'], 5, 40)
+        pivot_df['Soil - Temperature'] = replace_out_of_range(pivot_df['Soil - Temperature'], 0, 50)
 
     if 'Soil - PH' in pivot_df.columns:
         pivot_df['Soil - PH'] = replace_out_of_range(pivot_df['Soil - PH'], 0, 14)
+
+    if 'Soil - Moisture' in pivot_df.columns:
+        pivot_df['Soil - Moisture'] = replace_out_of_range(pivot_df['Soil - Moisture'], 0, 14)
 
     data_dict = {}
     for _, row in pivot_df.iterrows():
@@ -108,7 +110,10 @@ def fetch_new_data(since_timestamp=None):
         timestamp = f"{start_time.strftime('%Y-%m-%dT%H:%M:%S')} - {end_time.strftime('%H:%M:%S')}"
         if devicename not in data_dict:
             data_dict[devicename] = {}
-        data_dict[devicename][timestamp] = row.drop(['devicename', 'deviceid', 'hourly_interval']).to_dict()
+        
+        # Round values to 1 decimal place
+        values = row.drop(['devicename', 'deviceid', 'hourly_interval']).round(1).to_dict()
+        data_dict[devicename][timestamp] = values
 
     return data_dict
 
