@@ -76,7 +76,7 @@ def fetch_new_data(since_timestamp=None):
 
     combined_df['devicetimestamp'] = pd.to_datetime(combined_df['devicetimestamp']) + pd.Timedelta(hours=8)
 
-        # Apply data cleaning before aggregation
+    # Apply data cleaning before aggregation
     def replace_out_of_range(series, min_val, max_val):
         valid_series = series.copy()
         mask = (series < min_val) | (series > max_val)
@@ -91,8 +91,6 @@ def fetch_new_data(since_timestamp=None):
         combined_df['Soil - PH'] = replace_out_of_range(combined_df['Soil - PH'], 0, 14)
         
     combined_df['minute_interval'] = combined_df['devicetimestamp'].dt.floor('T')
-
-
 
     # Process live data (non-aggregated data)
     live_data = {}
@@ -112,12 +110,15 @@ def push_live_data_to_firebase(data):
             encoded_timestamp = urllib.parse.quote(timestamp)
             url = f'{FIREBASE_DATABASE_URL}/Livedata/{device_name}/{encoded_timestamp}.json?auth={FIREBASE_DATABASE_SECRET}'
             
+            print(f"Pushing live data for {device_name} at {timestamp}: {values}")  # Debug statement
+            
             try:
                 response = requests.put(url, json=values)
                 response.raise_for_status()  # Raise an HTTPError for bad responses
                 print(f"Successfully pushed live data for {device_name} at {timestamp}")
             except requests.exceptions.HTTPError as http_err:
                 print(f"HTTP error occurred for live data of {device_name} at {timestamp}: {http_err}")
+                print(f"Response content: {response.text}")  # Log response content
             except Exception as err:
                 print(f"Other error occurred for live data of {device_name} at {timestamp}: {err}")
 
@@ -128,12 +129,15 @@ def push_aggregated_data_to_firebase(data):
             encoded_timestamp = urllib.parse.quote(timestamp)
             url = f'{FIREBASE_DATABASE_URL}/Tanks/data/{device_name}/{encoded_timestamp}.json?auth={FIREBASE_DATABASE_SECRET}'
             
+            print(f"Pushing aggregated data for {device_name} at {timestamp}: {values}")  # Debug statement
+            
             try:
                 response = requests.put(url, json=values)
                 response.raise_for_status()  # Raise an HTTPError for bad responses
                 print(f"Successfully pushed aggregated data for {device_name} at {timestamp}")
             except requests.exceptions.HTTPError as http_err:
                 print(f"HTTP error occurred for aggregated data of {device_name} at {timestamp}: {http_err}")
+                print(f"Response content: {response.text}")  # Log response content
             except Exception as err:
                 print(f"Other error occurred for aggregated data of {device_name} at {timestamp}: {err}")
 
@@ -158,7 +162,6 @@ if not combined_df.empty:
     ).reset_index()
     aggregated_data.columns.name = None
     aggregated_data.columns = [str(col) for col in aggregated_data.columns]
-
 
     # Convert aggregated data to dictionary format for pushing
     aggregated_data_dict = {}
