@@ -14,11 +14,15 @@ def get_latest_timestamp():
     response = requests.get(f'{FIREBASE_DATABASE_URL}/Tanks/data.json?auth={FIREBASE_DATABASE_SECRET}')
     data = response.json()
 
+    print(f"Fetched data from Firebase for latest timestamp: {data}")  # Debug statement
+
     if data:
         timestamps = []
         for device_data in data.values():
             if isinstance(device_data, dict):
                 timestamps.extend(device_data.keys())
+
+        print(f"Extracted timestamps: {timestamps}")  # Debug statement
 
         if timestamps:
             valid_timestamps = []
@@ -29,6 +33,8 @@ def get_latest_timestamp():
                     valid_timestamps.append(start_time)
                 except Exception as e:
                     print(f"Invalid timestamp format: {ts} - Error: {e}")
+
+            print(f"Valid timestamps: {valid_timestamps}")  # Debug statement
 
             if valid_timestamps:
                 latest_timestamp = max(valid_timestamps)
@@ -72,9 +78,14 @@ def fetch_new_data(since_timestamp=None):
     rows = cursor.fetchall()
     columns = [desc[0] for desc in cursor.description]
 
+    print(f"Fetched rows from PostgreSQL: {rows}")  # Debug statement
+    print(f"Columns: {columns}")  # Debug statement
+
     combined_df = pd.DataFrame(rows, columns=columns)
 
     combined_df['devicetimestamp'] = pd.to_datetime(combined_df['devicetimestamp']) + pd.Timedelta(hours=8)
+
+    print(f"Dataframe after timestamp adjustment:\n{combined_df.head()}")  # Debug statement
 
     # Apply data cleaning before aggregation
     def replace_out_of_range(series, min_val, max_val):
@@ -92,6 +103,8 @@ def fetch_new_data(since_timestamp=None):
         
     combined_df['minute_interval'] = combined_df['devicetimestamp'].dt.floor('T')
 
+    print(f"Dataframe after cleaning and aggregation:\n{combined_df.head()}")  # Debug statement
+
     # Process live data (non-aggregated data)
     live_data = {}
     for _, row in combined_df.iterrows():
@@ -100,6 +113,8 @@ def fetch_new_data(since_timestamp=None):
         if devicename not in live_data:
             live_data[devicename] = {}
         live_data[devicename][timestamp] = row.drop(['devicename', 'deviceid', 'minute_interval']).to_dict()
+
+    print(f"Live data prepared for pushing:\n{json.dumps(live_data, indent=2)}")  # Debug statement
 
     return live_data, combined_df
 
@@ -151,6 +166,7 @@ else:
     live_data, combined_df = fetch_new_data()
 
 if live_data:
+    print(f"Live data to push:\n{json.dumps(live_data, indent=2)}")  # Debug statement
     push_live_data_to_firebase(live_data)
 
 if not combined_df.empty:
@@ -175,4 +191,5 @@ if not combined_df.empty:
         aggregated_data_dict[devicename][timestamp] = row.drop(['devicename', 'deviceid', 'minute_interval']).to_dict()
 
     if aggregated_data_dict:
+        print(f"Aggregated data to push:\n{json.dumps(aggregated_data_dict, indent=2)}")  # Debug statement
         push_aggregated_data_to_firebase(aggregated_data_dict)
