@@ -102,11 +102,12 @@ def fetch_new_data(since_timestamp=None):
 
     # Group by 'deviceid' and get the latest entry for each group
     latest_live_df = pivot_df.loc[pivot_df.groupby(['deviceid'])['devicetimestamp'].idxmax()]
-    latest_live_df = latest_live_df.drop(columns=['hourly_interval'], inplace=True)
-
+    latest_live_df = latest_live_df.drop(columns=['hourly_interval'])  # Do not use inplace=True
+    
     # Group by 'devicename', 'deviceid', and 'hourly_interval' and calculate the mean
     grouped_df = pivot_df.groupby(['devicename', 'deviceid', 'hourly_interval']).mean().reset_index()
-    grouped_df = grouped_df.drop(columns=['devicetimestamp'], inplace=True)
+    grouped_df = grouped_df.drop(columns=['devicetimestamp'])  # Do not use inplace=True
+
 
     # Prepare data_dict1 from grouped_df
     data_dict1 = {}
