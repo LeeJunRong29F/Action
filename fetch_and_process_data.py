@@ -2,15 +2,34 @@ import requests
 import psycopg2
 import os
 import pandas as pd
-import json
 
+# Firebase configuration
 FIREBASE_DATABASE_URL = os.getenv('FIREBASE_DATABASE_URL')
 FIREBASE_DATABASE_SECRET = os.getenv('FIREBASE_DATABASE_SECRET')
 
 # Function to get the latest timestamp from Firebase
 def get_latest_timestamp():
     response = requests.get(f'{FIREBASE_DATABASE_URL}/Tanks/data.json?auth={FIREBASE_DATABASE_SECRET}')
-	get_latest_timestamp():
+    data = response.json()
+
+    if data:
+        timestamps = []
+        for device_data in data.values():
+            if isinstance(device_data, dict):
+                timestamps.extend(device_data.keys())
+
+        if timestamps:
+            valid_timestamps = []
+            for ts in timestamps:
+                try:
+                    start_time_str = ts.split(" - ")[0]
+                    start_time = pd.to_datetime(start_time_str, format='%Y-%m-%dT%H:%M:%S')
+                    valid_timestamps.append(start_time)
+                except Exception as e:
+                    print(f"Invalid timestamp format: {ts} - Error: {e}")
+
+            if valid_timestamps:
+                latest_timestamp = max(valid_timestamps)
                 return latest_timestamp
     return None
 
@@ -100,11 +119,17 @@ def push_data_to_firebase(data):
                 print(f"Failed to push data for {device_name} at {timestamp}: {response.content}")
 
 # Main process
-latest_timestamp = get_latest_timestamp()
-if latest_timestamp:
-	push_data_to_firebase(data):
+def main():
+    latest_timestamp = get_latest_timestamp()
+    if latest_timestamp:
+        print(f"Latest timestamp from Firebase: {latest_timestamp}")
+        new_data = fetch_new_data(latest_timestamp)
+    else:
+        print("No data found in Firebase or unable to fetch latest timestamp. Fetching all data.")
+        new_data = fetch_new_data()
 
-if new_data:
-    push_data_to_firebase(new_data)
+    if new_data:
+        push_data_to_firebase(new_data)
 
-
+if __name__ == "__main__":
+    main()
