@@ -102,9 +102,11 @@ def fetch_new_data(since_timestamp=None):
 
     # Group by 'deviceid' and get the latest entry for each group
     latest_live_df = pivot_df.loc[pivot_df.groupby(['deviceid'])['devicetimestamp'].idxmax()]
+    latest_live_df = latest_live_df.drop(columns=['hourly_interval'], inplace=True)
 
     # Group by 'devicename', 'deviceid', and 'hourly_interval' and calculate the mean
     grouped_df = pivot_df.groupby(['devicename', 'deviceid', 'hourly_interval']).mean().reset_index()
+    grouped_df = grouped_df.drop(columns=['devicetimestamp'], inplace=True)
 
     # Prepare data_dict1 from grouped_df
     data_dict1 = {}
@@ -152,7 +154,7 @@ def push_data_to_firebase(data_dict1, data_dict2):
 
     # Push data_dict2
     for device_name, values in data_dict2.items():
-        url = f'{FIREBASE_DATABASE_URL}/Tanks/{device_name}/LiveData/LatestData.json?auth={FIREBASE_DATABASE_SECRET}'
+        url = f'{FIREBASE_DATABASE_URL}/Tanks/{device_name}/LiveData.json?auth={FIREBASE_DATABASE_SECRET}'
         values = serialize_data(values)  # Convert data to serializable format
         response = requests.put(url, json=values)
         if response.status_code != 200:
