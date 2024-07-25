@@ -75,10 +75,10 @@ def fetch_new_data(since_timestamp=None):
     combined_df = pd.DataFrame(rows, columns=columns)
 
     combined_df['devicetimestamp'] = pd.to_datetime(combined_df['devicetimestamp']) + pd.Timedelta(hours=8)
-    combined_df['hourly_interval'] = combined_df['devicetimestamp'].dt.floor('H')
+    combined_df['minute_interval'] = combined_df['devicetimestamp'].dt.floor('T')
 
     pivot_df = combined_df.pivot_table(
-        index=['devicename', 'deviceid', 'hourly_interval'],
+        index=['devicename', 'deviceid', 'minute_interval'],
         columns='sensordescription',
         values='value',
         aggfunc='mean'
@@ -94,31 +94,24 @@ def fetch_new_data(since_timestamp=None):
         return valid_series
 
     if 'Soil - Temperature' in pivot_df.columns:
-        pivot_df['Soil - Temperature'] = replace_out_of_range(pivot_df['Soil - Temperature'], 0, 50)
+        pivot_df['Soil - Temperature'] = replace_out_of_range(pivot_df['Soil - Temperature'], 5, 40)
 
     if 'Soil - PH' in pivot_df.columns:
         pivot_df['Soil - PH'] = replace_out_of_range(pivot_df['Soil - PH'], 0, 14)
 
-    if 'Soil - Moisture' in pivot_df.columns:
-        pivot_df['Soil - Moisture'] = replace_out_of_range(pivot_df['Soil - Moisture'], 0, 14)
-
     data_dict = {}
     for _, row in pivot_df.iterrows():
         devicename = row['devicename']
-        start_time = row['hourly_interval']
-        end_time = start_time + pd.Timedelta(hours=1)
-        timestamp = f"{start_time.strftime('%Y-%m-%dT%H:%M:%S')} - {end_time.strftime('%H:%M:%S')}"
+        start_time = row['minute_interval']
+        timestamp = start_time.strftime('%Y-%m-%dT%H:%M:%S')
         if devicename not in data_dict:
             data_dict[devicename] = {}
-        
-        # Round values to 1 decimal place
-        values = row.drop(['devicename', 'deviceid', 'hourly_interval']).round(1).to_dict()
-        data_dict[devicename][timestamp] = values
+        data_dict[devicename][timestamp] = row.drop(['devicename', 'deviceid', 'minute_interval']).to_dict()
 
     return data_dict
 
-# Function to push data to Firebase
-def push_data_to_firebase(data):
+# Function to push aggregated data to Firebase
+def push_aggregated_data_to_firebase(data):
     for device_name, timestamps in data.items():
         for timestamp, values in timestamps.items():
             # URL encode the timestamp to handle special characters
@@ -128,7 +121,24 @@ def push_data_to_firebase(data):
             try:
                 response = requests.put(url, json=values)
                 response.raise_for_status()  # Raise an HTTPError for bad responses
-                print(f"Successfully pushed data for {device_name} at {timestamp}")
+                print(f"Successfully pushed aggregated data for {device_name} at {timestamp}")
+            except requests.exceptions.HTTPError as http_err:
+                print(f"HTTP error occurred for {device_name} at {timestamp}: {http_err}")
+            except Exception as err:
+                print(f"Other error occurred for {device_name} at {timestamp}: {err}")
+
+# Function to push latest data to `Livedata`
+def push_latest_data_to_firebase(data):
+    for device_name, timestamps in data.items():
+        for timestamp, values in timestamps.items():
+            # URL encode the timestamp to handle special characters
+            encoded_timestamp = urllib.parse.quote(timestamp)
+            url = f'{FIREBASE_DATABASE_URL}/Livedata/{device_name}/{encoded_timestamp}.json?auth={FIREBASE_DATABASE_SECRET}'
+            
+            try:
+                response = requests.put(url, json=values)
+                response.raise_for_status()  # Raise an HTTPError for bad responses
+                print(f"Successfully pushed latest data for {device_name} at {timestamp}")
             except requests.exceptions.HTTPError as http_err:
                 print(f"HTTP error occurred for {device_name} at {timestamp}: {http_err}")
             except Exception as err:
@@ -144,4 +154,5 @@ else:
     new_data = fetch_new_data()
 
 if new_data:
-    push_data_to_firebase(new_data)
+    push_latest_data_to_firebase(new_data)  # Push latest data to Livedata
+    push_aggregated_data_to_firebase(new_data)  # Push aggregated data to Tanks/data
