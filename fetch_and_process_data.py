@@ -2,6 +2,7 @@ import requests
 import psycopg2
 import os
 import pandas as pd
+import json
 
 # Firebase configuration
 FIREBASE_DATABASE_URL = os.getenv('FIREBASE_DATABASE_URL')
@@ -128,10 +129,23 @@ def fetch_new_data(since_timestamp=None):
 
 # Function to push data to Firebase
 def push_data_to_firebase(data_dict1, data_dict2):
+    def serialize_data(data):
+        """Convert pd.Timestamp to ISO format string for JSON serialization."""
+        serialized_data = {}
+        for k, v in data.items():
+            if isinstance(v, pd.Timestamp):
+                serialized_data[k] = v.isoformat()
+            elif isinstance(v, dict):
+                serialized_data[k] = serialize_data(v)
+            else:
+                serialized_data[k] = v
+        return serialized_data
+
     # Push data_dict1
     for device_name, timestamps in data_dict1.items():
         for timestamp, values in timestamps.items():
             url = f'{FIREBASE_DATABASE_URL}/Tanks/{device_name}/HourlyData/{timestamp}.json?auth={FIREBASE_DATABASE_SECRET}'
+            values = serialize_data(values)  # Convert data to serializable format
             response = requests.put(url, json=values)
             if response.status_code != 200:
                 print(f"Failed to push data for {device_name} at {timestamp}: {response.content}")
@@ -139,6 +153,7 @@ def push_data_to_firebase(data_dict1, data_dict2):
     # Push data_dict2
     for device_name, values in data_dict2.items():
         url = f'{FIREBASE_DATABASE_URL}/Tanks/{device_name}/LiveData/LatestData.json?auth={FIREBASE_DATABASE_SECRET}'
+        values = serialize_data(values)  # Convert data to serializable format
         response = requests.put(url, json=values)
         if response.status_code != 200:
             print(f"Failed to push latest data for {device_name}: {response.content}")
