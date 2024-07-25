@@ -1,9 +1,9 @@
 import requests
-import psycopg2
-import os
 import pandas as pd
 import json
 import urllib.parse
+import os
+import psycopg2
 
 # Fetch secrets from environment variables
 FIREBASE_DATABASE_URL = os.getenv('FIREBASE_DATABASE_URL')
@@ -78,14 +78,9 @@ def fetch_new_data(since_timestamp=None):
     rows = cursor.fetchall()
     columns = [desc[0] for desc in cursor.description]
 
-    print(f"Fetched rows from PostgreSQL: {rows}")  # Debug statement
-    print(f"Columns: {columns}")  # Debug statement
-
     combined_df = pd.DataFrame(rows, columns=columns)
 
     combined_df['devicetimestamp'] = pd.to_datetime(combined_df['devicetimestamp']) + pd.Timedelta(hours=8)
-
-    print(f"Dataframe after timestamp adjustment:\n{combined_df.head()}")  # Debug statement
 
     # Apply data cleaning before aggregation
     def replace_out_of_range(series, min_val, max_val):
@@ -102,33 +97,23 @@ def fetch_new_data(since_timestamp=None):
         combined_df['Soil - PH'] = replace_out_of_range(combined_df['Soil - PH'], 0, 14)
         
     combined_df['minute_interval'] = combined_df['devicetimestamp'].dt.floor('T')
+    combined_df['dbtimestamp'] = combined_df['devicetimestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S')
 
-    print(f"Dataframe after cleaning and aggregation:\n{combined_df.head()}")  # Debug statement
+    print(f"Dataframe after fetching new data:\n{combined_df.head()}")  # Debug statement
 
-    # Process live data (non-aggregated data)
-    live_data = {}
-    for _, row in combined_df.iterrows():
-        devicename = row['devicename']
-        timestamp = row['devicetimestamp'].strftime('%Y-%m-%dT%H:%M:%S')
-        if devicename not in live_data:
-            live_data[devicename] = {}
-        live_data[devicename][timestamp] = row.drop(['devicename', 'deviceid', 'minute_interval']).to_dict()
-
-    print(f"Live data prepared for pushing:\n{json.dumps(live_data, indent=2)}")  # Debug statement
-
-    return live_data, combined_df
+    return combined_df
 
 # Function to push live data to Firebase
 def push_live_data_to_firebase(data):
-    for device_name, timestamps in data.items():
-        for timestamp, values in timestamps.items():
+    for device_name, values in data.items():
+        for timestamp, value in values.items():
             encoded_timestamp = urllib.parse.quote(timestamp)
-            url = f'{FIREBASE_DATABASE_URL}/Livedata/{device_name}/{encoded_timestamp}.json?auth={FIREBASE_DATABASE_SECRET}'
+            url = f'{FIREBASE_DATABASE_URL}/Tanks/{device_name}/LiveData/{encoded_timestamp}.json?auth={FIREBASE_DATABASE_SECRET}'
             
-            print(f"Pushing live data for {device_name} at {timestamp}: {values}")  # Debug statement
+            print(f"Pushing live data for {device_name} at {timestamp}: {value}")  # Debug statement
             
             try:
-                response = requests.put(url, json=values)
+                response = requests.put(url, json=value)
                 response.raise_for_status()  # Raise an HTTPError for bad responses
                 print(f"Successfully pushed live data for {device_name} at {timestamp}")
             except requests.exceptions.HTTPError as http_err:
@@ -160,21 +145,18 @@ def push_aggregated_data_to_firebase(data):
 latest_timestamp = get_latest_timestamp()
 if latest_timestamp:
     print(f"Latest timestamp from Firebase: {latest_timestamp}")
-    live_data, combined_df = fetch_new_data(latest_timestamp)
+    combined_df = fetch_new_data(latest_timestamp)
 else:
     print("No data found in Firebase or unable to fetch latest timestamp. Fetching all data.")
-    live_data, combined_df = fetch_new_data()
-
-if live_data:
-    print(f"Live data to push:\n{json.dumps(live_data, indent=2)}")  # Debug statement
-    push_live_data_to_firebase(live_data)
+    combined_df = fetch_new_data()
 
 if not combined_df.empty:
+    # Process aggregated data
     aggregated_data = combined_df.pivot_table(
         index=['devicename', 'deviceid', 'minute_interval'],
         columns='sensordescription',
         values='value',
-        aggfunc='mean'
+        aggfunc='mean'  # Aggregating using mean for minute intervals
     ).reset_index()
     aggregated_data.columns.name = None
     aggregated_data.columns = [str(col) for col in aggregated_data.columns]
@@ -193,3 +175,16 @@ if not combined_df.empty:
     if aggregated_data_dict:
         print(f"Aggregated data to push:\n{json.dumps(aggregated_data_dict, indent=2)}")  # Debug statement
         push_aggregated_data_to_firebase(aggregated_data_dict)
+
+    # Process live data
+    live_data = {}
+    for _, row in combined_df.iterrows():
+        devicename = row['devicename']
+        timestamp = row['dbtimestamp']
+        if devicename not in live_data:
+            live_data[devicename] = {}
+        live_data[devicename][timestamp] = row.drop(['devicename', 'deviceid', 'minute_interval', 'dbtimestamp']).to_dict()
+
+    if live_data:
+        print(f"Live data to push:\n{json.dumps(live_data, indent=2)}")  # Debug statement
+        push_live_data_to_firebase(live_data)
