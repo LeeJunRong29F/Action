@@ -103,6 +103,25 @@ def fetch_new_data(since_timestamp=None):
 
     return combined_df
 
+# Function to push new data to Firebase
+def push_new_data_to_firebase(data_dict):
+    for devicename, timestamps in data_dict.items():
+        for timestamp, values in timestamps.items():
+            encoded_timestamp = urllib.parse.quote(timestamp)
+            url = f'{FIREBASE_DATABASE_URL}/Tanks/data/{devicename}/{encoded_timestamp}.json?auth={FIREBASE_DATABASE_SECRET}'
+            
+            print(f"Pushing new data for {devicename} at {timestamp}: {values}")  # Debug statement
+            
+            try:
+                response = requests.put(url, json=values)
+                response.raise_for_status()  # Raise an HTTPError for bad responses
+                print(f"Successfully pushed new data for {devicename} at {timestamp}")
+            except requests.exceptions.HTTPError as http_err:
+                print(f"HTTP error occurred for new data of {devicename} at {timestamp}: {http_err}")
+                print(f"Response content: {response.text}")  # Log response content
+            except Exception as err:
+                print(f"Other error occurred for new data of {devicename} at {timestamp}: {err}")
+
 # Function to push aggregated data to Firebase
 def push_aggregated_data_to_firebase(data):
     for device_name, timestamps in data.items():
