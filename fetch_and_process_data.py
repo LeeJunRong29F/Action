@@ -76,7 +76,7 @@ def fetch_new_data(since_timestamp=None):
 
     combined_df['devicetimestamp'] = pd.to_datetime(combined_df['devicetimestamp']) + pd.Timedelta(hours=8)
 
-    # Apply data cleaning before aggregation
+        # Apply data cleaning before aggregation
     def replace_out_of_range(series, min_val, max_val):
         valid_series = series.copy()
         mask = (series < min_val) | (series > max_val)
@@ -89,23 +89,26 @@ def fetch_new_data(since_timestamp=None):
 
     if 'Soil - PH' in combined_df.columns:
         combined_df['Soil - PH'] = replace_out_of_range(combined_df['Soil - PH'], 0, 14)
+        
+    combined_df['minute_interval'] = combined_df['devicetimestamp'].dt.floor('T')
 
-    return combined_df
 
-# Function to push live data (unaggregated) to Firebase
-def push_live_data_to_firebase(df):
-    live_data_dict = {}
-    for _, row in df.iterrows():
+
+    # Process live data (non-aggregated data)
+    live_data = {}
+    for _, row in combined_df.iterrows():
         devicename = row['devicename']
         timestamp = row['devicetimestamp'].strftime('%Y-%m-%dT%H:%M:%S')
-        
-        if devicename not in live_data_dict:
-            live_data_dict[devicename] = {}
-        live_data_dict[devicename][timestamp] = row.drop(['devicename', 'deviceid', 'devicetimestamp']).to_dict()
+        if devicename not in live_data:
+            live_data[devicename] = {}
+        live_data[devicename][timestamp] = row.drop(['devicename', 'deviceid', 'minute_interval']).to_dict()
 
-    for device_name, timestamps in live_data_dict.items():
+    return live_data, combined_df
+
+# Function to push live data to Firebase
+def push_live_data_to_firebase(data):
+    for device_name, timestamps in data.items():
         for timestamp, values in timestamps.items():
-            # URL encode the timestamp to handle special characters
             encoded_timestamp = urllib.parse.quote(timestamp)
             url = f'{FIREBASE_DATABASE_URL}/Livedata/{device_name}/{encoded_timestamp}.json?auth={FIREBASE_DATABASE_SECRET}'
             
@@ -114,50 +117,14 @@ def push_live_data_to_firebase(df):
                 response.raise_for_status()  # Raise an HTTPError for bad responses
                 print(f"Successfully pushed live data for {device_name} at {timestamp}")
             except requests.exceptions.HTTPError as http_err:
-                print(f"HTTP error occurred for {device_name} at {timestamp}: {http_err}")
+                print(f"HTTP error occurred for live data of {device_name} at {timestamp}: {http_err}")
             except Exception as err:
-                print(f"Other error occurred for {device_name} at {timestamp}: {err}")
+                print(f"Other error occurred for live data of {device_name} at {timestamp}: {err}")
 
-# Function to aggregate data and push to Firebase
-def push_aggregated_data_to_firebase(df):
-    df['minute_interval'] = df['devicetimestamp'].dt.floor('T')
-    
-    # Apply data cleaning before aggregation
-    def replace_out_of_range(series, min_val, max_val):
-        valid_series = series.copy()
-        mask = (series < min_val) | (series > max_val)
-        valid_series[mask] = pd.NA
-        valid_series = valid_series.ffill().fillna(0)
-        return valid_series
-
-    if 'Soil - Temperature' in df.columns:
-        df['Soil - Temperature'] = replace_out_of_range(df['Soil - Temperature'], 5, 40)
-
-    if 'Soil - PH' in df.columns:
-        df['Soil - PH'] = replace_out_of_range(df['Soil - PH'], 0, 14)
-
-    pivot_df = df.pivot_table(
-        index=['devicename', 'deviceid', 'minute_interval'],
-        columns='sensordescription',
-        values='value',
-        aggfunc='mean'
-    ).reset_index()
-    pivot_df.columns.name = None
-    pivot_df.columns = [str(col) for col in pivot_df.columns]
-
-    data_dict = {}
-    for _, row in pivot_df.iterrows():
-        devicename = row['devicename']
-        start_time = row['minute_interval']
-        timestamp = start_time.strftime('%Y-%m-%dT%H:%M:%S')
-
-        if devicename not in data_dict:
-            data_dict[devicename] = {}
-        data_dict[devicename][timestamp] = row.drop(['devicename', 'deviceid', 'minute_interval']).to_dict()
-
-    for device_name, timestamps in data_dict.items():
+# Function to push aggregated data to Firebase
+def push_aggregated_data_to_firebase(data):
+    for device_name, timestamps in data.items():
         for timestamp, values in timestamps.items():
-            # URL encode the timestamp to handle special characters
             encoded_timestamp = urllib.parse.quote(timestamp)
             url = f'{FIREBASE_DATABASE_URL}/Tanks/data/{device_name}/{encoded_timestamp}.json?auth={FIREBASE_DATABASE_SECRET}'
             
@@ -166,23 +133,43 @@ def push_aggregated_data_to_firebase(df):
                 response.raise_for_status()  # Raise an HTTPError for bad responses
                 print(f"Successfully pushed aggregated data for {device_name} at {timestamp}")
             except requests.exceptions.HTTPError as http_err:
-                print(f"HTTP error occurred for {device_name} at {timestamp}: {http_err}")
+                print(f"HTTP error occurred for aggregated data of {device_name} at {timestamp}: {http_err}")
             except Exception as err:
-                print(f"Other error occurred for {device_name} at {timestamp}: {err}")
+                print(f"Other error occurred for aggregated data of {device_name} at {timestamp}: {err}")
 
 # Main process
 latest_timestamp = get_latest_timestamp()
 if latest_timestamp:
     print(f"Latest timestamp from Firebase: {latest_timestamp}")
-    combined_df = fetch_new_data(latest_timestamp)
+    live_data, combined_df = fetch_new_data(latest_timestamp)
 else:
     print("No data found in Firebase or unable to fetch latest timestamp. Fetching all data.")
-    combined_df = fetch_new_data()
+    live_data, combined_df = fetch_new_data()
 
-# Push live (unaggregated) data
-if not combined_df.empty:
-    push_live_data_to_firebase(combined_df)  # Push live data to Livedata
+if live_data:
+    push_live_data_to_firebase(live_data)
 
-# Aggregate data and push
 if not combined_df.empty:
-    push_aggregated_data_to_firebase(combined_df)  # Push aggregated data to Tanks/data
+    aggregated_data = combined_df.pivot_table(
+        index=['devicename', 'deviceid', 'minute_interval'],
+        columns='sensordescription',
+        values='value',
+        aggfunc='mean'
+    ).reset_index()
+    aggregated_data.columns.name = None
+    aggregated_data.columns = [str(col) for col in aggregated_data.columns]
+
+
+    # Convert aggregated data to dictionary format for pushing
+    aggregated_data_dict = {}
+    for _, row in aggregated_data.iterrows():
+        devicename = row['devicename']
+        start_time = row['minute_interval']
+        end_time = start_time + pd.Timedelta(minutes=1)
+        timestamp = f"{start_time.strftime('%Y-%m-%dT%H:%M:%S')} - {end_time.strftime('%H:%M:%S')}"
+        if devicename not in aggregated_data_dict:
+            aggregated_data_dict[devicename] = {}
+        aggregated_data_dict[devicename][timestamp] = row.drop(['devicename', 'deviceid', 'minute_interval']).to_dict()
+
+    if aggregated_data_dict:
+        push_aggregated_data_to_firebase(aggregated_data_dict)
