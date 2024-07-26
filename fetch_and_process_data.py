@@ -12,6 +12,22 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 FIREBASE_DATABASE_URL = os.getenv('FIREBASE_DATABASE_URL')
 FIREBASE_DATABASE_SECRET = os.getenv('FIREBASE_DATABASE_SECRET')
 
+def delete_firebase_directory(directory_path):
+    try:
+        url = f'{FIREBASE_DATABASE_URL}/{directory_path}.json?auth={FIREBASE_DATABASE_SECRET}'
+        response = requests.delete(url)
+        response.raise_for_status()
+        if response.status_code == 200:
+            logging.info(f"Successfully deleted directory: {directory_path}")
+        else:
+            logging.warning(f"Failed to delete directory: {directory_path}. Response: {response.content}")
+    except requests.RequestException as e:
+        logging.error(f"Error deleting directory in Firebase: {e}")
+        
+# Example usage of deleting a directory before pushing new data
+directory_to_delete = "Tanks"  # Adjust this to the path you need to delete
+delete_firebase_directory(directory_to_delete)
+
 # Function to get the latest timestamp from Firebase
 def get_latest_timestamp():
     try:
